@@ -43,7 +43,7 @@ public class VehicleTelematics {
         
         String inFilePath = args[0];
         String outFolderPath = args[1];
-        DataStreamSource<String> carsMapStream = env.readTextFile(inFilePath);
+        DataStreamSource<String> carsMapStream = env.readTextFile(inFilePath).setParallelism(1); //To process input data in order
 
         SingleOutputStreamOperator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> vehicleStream;
         vehicleStream = transformCSVIntoTuple8(carsMapStream);
@@ -62,7 +62,7 @@ public class VehicleTelematics {
         avgSpeedOutputStream.writeAsCsv(outFolderPath + "/avgspeedfines.csv", WriteMode.OVERWRITE);
         
         try {
-            env.execute("Speed Radar");
+            env.execute("Vehicle Telematics");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -107,7 +107,8 @@ public class VehicleTelematics {
             });
     }
 
-    private static SingleOutputStreamOperator<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>> filterByAccident(SingleOutputStreamOperator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> vehicleStream) {
+    private static SingleOutputStreamOperator<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>> filterByAccident(
+            SingleOutputStreamOperator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> vehicleStream) {
         return vehicleStream.keyBy(1).countWindow(4, 1).apply(new WindowFunction<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple, GlobalWindow>() {
             @Override
             public void apply(Tuple key, GlobalWindow w, Iterable<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> input, Collector<Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>> out) throws Exception {
@@ -161,6 +162,9 @@ public class VehicleTelematics {
                         Iterator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iterator = input.iterator();
                         Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer> next = null;
                         boolean exists52 = false;
+                        boolean exists53 = false;
+                        boolean exists54 = false;
+                        boolean exists55 = false;
                         boolean exists56 = false;
                         Integer time1 = Integer.MAX_VALUE;
                         Integer time2 = 0;
@@ -169,12 +173,15 @@ public class VehicleTelematics {
                             next = iterator.next();
                             avgspeed += next.f2;
                             exists52 = next.f6.equals(52) ? true : exists52;
+                            exists53= next.f6.equals(53) ? true : exists53;
+                            exists54 = next.f6.equals(54) ? true : exists54;
+                            exists55 = next.f6.equals(55) ? true : exists55;
                             exists56 = next.f6.equals(56) ? true : exists56;
                             time1 = time1 < next.f0 ? time1 : next.f0;
                             time2 = time2 > next.f0 ? time2 : next.f0;
                         }
                         avgspeed /= Iterables.size(input);
-                        if (exists52 && exists56)
+                        if (exists52 && exists53 && exists54 && exists55 && exists56)
                             // Time1, Time2, VID, XWay, Dir, AvgSpeed
                             out.collect(new Tuple6<>(time1, time2, next.f1, next.f3, next.f5, avgspeed));
                     }
